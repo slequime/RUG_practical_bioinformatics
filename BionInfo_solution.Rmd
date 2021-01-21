@@ -1,0 +1,151 @@
+---
+title: "New York City Street Tree Census"
+author: "Sebastian Lequime"
+date: "19/01/2021"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+## Preamble
+
+This file has been generated as part of the "Practical Bioinformatics for Biologist" course given at the University of Groningen, The Netherlands, in the 2020-2021 academic year. The data it uses has been generated from a citywide stree tree census conducted by New York City's Parks & Recreation department in 2005-2006. It can be accessed on [Data.gov](https://catalog.data.gov/vi_VN/dataset/2005-street-tree-census-e1029), the repository for the U.S. Governement's open data.
+
+## Loading the data
+
+```{r setup, message=FALSE}
+# Packages ---------------------------------
+#Make sure you installed the package before trying to load them. Use the GUI of RStudio (Tools > Install pacakges...) or use the command: install.package("your.package")
+library(readr)
+library(tidyverse)
+library(ggmap)
+
+# Read in the data ---------------------------------
+StreetTreeCensus <- read_csv("~/Downloads/NewYorkCity_StreetTreeCensus_2005.csv") #change to the path of your data
+
+# Write the session information
+sessionInfo()
+```
+
+## Exploring the data set
+
+Start exploring the dataset by answering these questions:
+
+### Question 4
+
+1. How many street trees have been counted in NYC during this census?
+
+```{r Question4-1}
+nrow(StreetTreeCensus) #number of line of the table is the number of trees
+```
+
+The dataset contains `r nrow(StreetTreeCensus)` lines, each of which is an individual tree.
+
+2. How many different tree species have been counted?
+
+```{r Question4-2}
+tree.species <- StreetTreeCensus %>% group_by(spc_latin) %>% summarise(Nr=n())
+#Here, I summarise the data. I first take the data, group for each species, identified by their latin name (spc_latin), and then summarise, using the function n() to count the occurence of each species in the data.
+
+nrow(tree.species) #number of line of the summary  table is the number of tree species.
+```
+In total, `r nrow(tree.species)` different tree species are found in New York City.
+
+3. What is the most abundant tree species? How many individual trees of this species have been counted?
+
+```{r Question4-3}
+tree.species[tree.species$Nr == max(tree.species$Nr),]$spc_latin
+#What I use here looks a bit complex. Put in plain text, I ask R to take my summary table created before (tree.species), find the line (tree.species[x,]) of that table where the number (tree.species$Nr) of counted tree is equal (==) to the maximum number counted (max(tree.species$Nr)). This will give me the full line, but I am only interested in the latin name (spc_latin), so I only call the column (tree.species$x).
+```
+
+Now the thing is that in the table, the latin name is written with capital letters. For aesthetical reason, I will directly change that in the data using:
+
+```{r Question4-3.change}
+StreetTreeCensus$spc_latin <- paste(str_sub(StreetTreeCensus$spc_latin,1,1),tolower(str_sub(StreetTreeCensus$spc_latin,2)), sep="")
+#Again, it's a bit complex. Let's break it down: 
+# - str_sub(StreetTreeCensus$spc_latin,1,1): str_sub("PLATANUS ACERIFOLIA", S,E) takes a string of characters and select between the start (S) character until the last (E) character. Here, it take from the first to the first character, hence only the first. For str_sub("PLATANUS ACERIFOLIA", 1,1), the output would be "P".
+# - str_sub(StreetTreeCensus$spc_latin,2) uses the same function, but if you do not provide an end, it will go until the end of the string. For str_sub("PLATANUS ACERIFOLIA", 2), the output would be "LATANUS ACERIFOLIA".
+# - tolower() changes the case, from capital letters to lower case letters. tolower("ABCD") would thus give "abcd". If you join both tolower(str_sub("PLATANUS ACERIFOLIA", 2)), you would thus get "latanus acerifolia".
+# - paste(x,y,sep="") will put together two string of characters as one string, seperated by the value provided for "sep=". paste(str_sub("PLATANUS ACERIFOLIA", 1,1), tolower(str_sub("PLATANUS ACERIFOLIA", 2)), sep="") would thus give "Platanus acerifolia". If you change sep= from sep="" to sep="_", you'll get "P_latanus acerifolia".
+# Now instead of a single species, I do that for the whole spc_latin column: StreetTreeCensus$spc_latin
+# I then write again on that column to replace the previous, capitalized values.
+
+# I then have to run again everything that depends on the original data:
+tree.species <- StreetTreeCensus %>% group_by(spc_latin) %>% summarise(Nr=n())
+tree.species[tree.species$Nr == max(tree.species$Nr),]$spc_latin
+
+#The number of trees is the maximum value of the table, hence:
+max(tree.species$Nr)
+```
+
+The most represented tree is *`r tree.species[tree.species$Nr == max(tree.species$Nr),]$spc_latin`*, with `r max(tree.species$Nr)` individual trees.
+
+### Question 5
+
+Now we will compare 3 maple tree species: the field maple (*Acer campestre*), the Japanese maple (*Acer palmatum*) and the sycamore maple (*Acer pseudoplatanus*).
+
+1. How much of each of these trees have been counted in NYC?
+
+```{r Question5-1}
+#I first subset the dataset to keep only the 3 tree species of interest:
+tree.acer<- subset(StreetTreeCensus, spc_latin %in% c("Acer campestre","Acer palmatum","Acer pseudoplatanus"))
+#The subset function is very useful: it will subset your data when the conditionnal function you provide is true. Here I want to keep trees (lines in the table) where the latin name is the same (%in%) as the ones present in the vector provided.
+
+#To answer the question there are different ways: you can generate a summary table, as above, or you can avoid generating a new object and directly get the data using the subsect function:
+
+nrow(subset(tree.acer, spc_latin=="Acer campestre")) #for Acer campestre
+nrow(subset(tree.acer, spc_latin=="Acer palmatum")) #for Acer palmatum
+nrow(subset(tree.acer, spc_latin=="Acer pseudoplatanus")) #for Acer pseudoplatanus
+```
+
+In NYC, `r nrow(subset(tree.acer, spc_latin=="Acer campestre"))` *Acer campestre*, `r nrow(subset(tree.acer, spc_latin=="Acer palmatum"))` *Acer palmatum*, and `r nrow(subset(tree.acer, spc_latin=="Acer pseudoplatanus"))` *Acer pseudoplatanus* have been counted.
+
+2. How many *Acer palmatum* trees have been deemed to be in “Poor” or “Dead” condition? Which proportion/percentage does that represent?
+
+```{r Question5-2}
+#To answer the question there are different ways: you can again generate a summary table, as above, or you can avoid generating a new object and directly get the data using the subsect function:
+
+nrow(subset(tree.acer, spc_latin=="Acer palmatum" & status %in% c("Poor","Dead"))) #The condition for the subset function can call on different column, here using the latin name (spc_latin) and the health status (status), combined with an AND logical argument (&).
+
+#To get the ratio, you can divid by the total number of Acer palmatum in the dataset:
+nrow(subset(tree.acer, spc_latin=="Acer palmatum" & status %in% c("Poor","Dead")))/nrow(subset(tree.acer, spc_latin=="Acer palmatum"))
+                                                                                          
+#Because we want a percentage, we will first round a bit to avoid to many decimals, and multiply by 100:
+round(nrow(subset(tree.acer, spc_latin=="Acer palmatum" & status %in% c("Poor","Dead")))/nrow(subset(tree.acer, spc_latin=="Acer palmatum")), digit=4)*100
+#The round() function use the argument (digit=) to set the number of decimal places to keep (from the ratio that you calculated).
+```
+
+`r nrow(subset(tree.acer, spc_latin=="Acer palmatum" & status %in% c("Poor","Dead")))` *Acer palmatum* have had their health status classified as "Poor" or "Dead" by the censors, which represents about `r round(nrow(subset(tree.acer, spc_latin=="Acer palmatum" & status %in% c("Poor","Dead")))/nrow(subset(tree.acer, spc_latin=="Acer palmatum")), digit=4)*100` % of the trees of that species.
+
+3. Generate a stacked bar plot to show the proportion of each status (be sure to change the name of the scales, the color used and the order of the health status)
+
+```{r Question5-3, fig.align='center'}
+tree.acer$status <- factor(tree.acer$status , levels = c("Excellent", "Good", "Poor","Dead")) #That way, I reorder the factor levels, to get nice ordered levels for the plots.
+
+ggplot() + 
+  geom_bar(data = tree.acer, mapping = aes(x = spc_latin, fill = status), position = "fill") + #make a bar plot, position="fill" will use the counts of each species.
+  scale_fill_brewer(name="Health status",palette="BrBG", direction=-1) + #changing the color scale's name and color, using a green/brown palette, direction=-1 allows to have the lower value in my factors to get the brown color (purely aesthetics)
+  theme_bw() + #changing the graphical style, here aiming for a black and white theme
+  labs(x="Tree species", y="Proportion") #name of the scales
+```
+
+### Question 6
+
+To plot a map, we will use the following script:
+
+```{r Question6, warning=FALSE, message=FALSE, fig.align='center', fig.dim = c(8, 14)}
+
+#First, we download the empty map:
+nyc.map <- get_stamenmap(bbox = c(left = -74.29615, bottom = 40.496638, right = -73.553975, top = 40.919604), zoom=12, maptype = "toner-lite")
+
+ggmap(nyc.map) + 
+  geom_point(data=tree.acer, aes(x=longitude, y=latitude, color=status)) + #Plots points into the map using longitude and latitute data, and color them according to their health status.
+  facet_grid(rows = vars(spc_latin)) + #Makes one plot for each species in a grid fashion, one row for each tree species.
+  scale_color_brewer(name="Health status",palette="BrBG", direction=-1) + #this changes the color (see Question 5)
+  labs(x="Longitude", y="Latitude") #Change the names of the scales
+```
+
+### Question 7
+
+Have a look at the .Rmd file to see how you could have used R Markdown!
